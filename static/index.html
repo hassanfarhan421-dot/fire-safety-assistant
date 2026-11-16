@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Space Fire Safety Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ---------- Theme: change the accent here and everything follows ---------- */
+    :root {
+      --bg: #0a0c0f;
+      --panel: #0f1217;
+      --line: #1f2630;
+      --accent: #5fd7e6;
+      --warn: #e6a85f;
+      --err: #e66a5f;
+      --text: #c9d3dc;
+      --dim: #6b7885;
+      --font: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    /* ---------- Dark scrollbars (applies to every scrollable area, textarea included) ---------- */
+    :root {
+      color-scheme: dark;
+    }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #2a3542 transparent;
+    }
+
+    /* Firefox + current Chrome */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    /* older Chrome / Safari */
+    ::-webkit-scrollbar-track,
+    ::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #2a3542;
+      border-radius: 2px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      background-color: var(--bg);
+      /* faint grid texture */
+      background-image:
+        linear-gradient(rgba(95, 215, 230, .035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(95, 215, 230, .035) 1px, transparent 1px);
+      background-size: 32px 32px;
+      color: var(--text);
+      font: 13px/1.6 var(--font);
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    :focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* ---------- Top bar ---------- */
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      font-size: 12px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--dim);
+    }
+
+    .light {
+      width: 8px;
+      height: 8px;
+      background: var(--dim);
+    }
+
+    .light.on {
+      background: var(--accent);
+    }
+
+    .light.off {
+      background: var(--err);
+    }
+
+    .dim {
+      color: var(--dim);
+    }
+
+    /* ---------- Layout ---------- */
+    main {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 12px;
+      padding: 12px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .ph {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--dim);
+      list-style: none;
+      cursor: default;
+    }
+
+    summary.ph {
+      cursor: pointer;
+    }
+
+    .tele {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .tele .panel {
+      flex: none;
+    }
+
+    /* ---------- Console ---------- */
+    .log {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    .log>div {
+      margin-bottom: 14px;
+    }
+
+    .q {
+      color: var(--accent);
+      white-space: pre-wrap;
+    }
+
+    .sys,
+    .wait {
+      color: var(--dim);
+    }
+
+    .err {
+      color: var(--err);
+    }
+
+    .a .txt {
+      white-space: pre-wrap;
+      max-width: 80ch;
+    }
+
+    .cur::after {
+      content: "\2588";
+      margin-left: 2px;
+      color: var(--accent);
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .sec {
+      margin-top: 10px;
+      max-width: 80ch;
+    }
+
+    .sec summary {
+      cursor: pointer;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .sec summary:hover {
+      color: var(--accent);
+    }
+
+    .sec ul {
+      padding-left: 18px;
+      margin-top: 6px;
+      color: var(--text);
+    }
+
+    .sec li {
+      margin-bottom: 4px;
+    }
+
+    .bar {
+      display: flex;
+      align-items: stretch;
+      border-top: 1px solid var(--line);
+    }
+
+    .prompt {
+      padding: 10px 0 0 14px;
+      color: var(--accent);
+    }
+
+    .bar textarea {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      color: var(--text);
+      font: inherit;
+      padding: 10px;
+      resize: none;
+    }
+
+    .bar textarea:focus-visible {
+      outline: none;
+    }
+
+    .btn {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      font: inherit;
+      font-size: 12px;
+      letter-spacing: .1em;
+      padding: 0 18px;
+      margin: 8px;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .btn:disabled {
+      color: var(--dim);
+      border-color: var(--line);
+      cursor: not-allowed;
+    }
+
+    /* ---------- Telemetry ---------- */
+    .empty {
+      padding: 14px 12px;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: .1em;
+    }
+
+    .chartbox {
+      position: relative;
+      height: 270px;
+      padding: 10px;
+    }
+
+    .scroll {
+      overflow-x: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 5px 10px;
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--dim);
+      font-weight: 400;
+      font-size: 10px;
+      letter-spacing: .12em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+
+    figure img,
+    .noimg {
+      width: 100%;
+      height: 80px;
+      object-fit: cover;
+      display: block;
+      border: 1px solid var(--line);
+    }
+
+    .noimg {
+      display: grid;
+      place-items: center;
+      color: var(--dim);
+      font-size: 10px;
+      letter-spacing: .1em;
+    }
+
+    figcaption {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 4px;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .tag {
+      color: var(--accent);
+      letter-spacing: .1em;
+    }
+
+    .irow {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 8px;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .irow:last-child {
+      border-bottom: 0;
+    }
+
+    .irow .btn {
+      margin: 0;
+      padding: 3px 12px;
+    }
+
+    .st {
+      grid-column: 1 / -1;
+      font-size: 11px;
+      color: var(--dim);
+      overflow-wrap: anywhere;
+    }
+
+    .st.ok {
+      color: var(--accent);
+    }
+
+    .st.bad {
+      color: var(--err);
+    }
+
+    .trace {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+
+    .kv {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dotted var(--line);
+    }
+
+    .k {
+      color: var(--dim);
+    }
+
+    @media (max-width: 800px) {
+
+      html,
+      body {
+        height: auto;
+      }
+
+      body {
+        min-height: 100%;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .console {
+        min-height: 70vh;
+      }
+
+      .tele {
+        overflow: visible;
+      }
+
+      .top {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="top">
+    <div>Space Fire Safety // v0.1</div>
+    <div class="stat"><span id="light" class="light"></span><span id="statusText">CHECKING BACKEND...</span></div>
+    <div id="clock" class="dim"></div>
+  </header>
+
+  <main>
+    <!-- LEFT: chat console -->
+    <section class="panel console">
+      <div class="ph">Console</div>
+      <div id="log" class="log" role="log" aria-live="polite"></div>
+      <div class="bar">
+        <span class="prompt">&gt;</span>
+        <textarea id="input" rows="2" aria-label="Question"
+          placeholder="Ask about flame behavior, fuels, or fire safety..."></textarea>
+        <button id="send" class="btn">SEND</button>
+      </div>
+    </section>
+
+    <!-- RIGHT: telemetry -->
+    <aside class="tele">
+      <section class="panel">
+        <div class="ph">Chart</div>
+        <div id="chartBox" class="chartbox" hidden><canvas id="chartCanvas"></canvas></div>
+        <p id="chartEmpty" class="empty">NO CHART DATA</p>
+      </section>
+      <section class="panel">
+        <div class="ph">Measurements</div>
+        <div id="dataBox">
+          <p class="empty">NO MEASUREMENTS YET</p>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="ph">Retrieved frames</div>
+        <div id="frames">
+          <p class="empty">NO IMAGES YET</p>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="ph">Ingest</div>
+        <div id="ingest"></div>
+      </section>
+      <section class="panel">
+        <details>
+          <summary class="ph">Trace</summary>
+          <div id="trace" class="trace"><span class="dim">No request yet.</span></div>
+        </details>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    // ---------- Helpers ----------
+    const $ = id => document.getElementById(id);
+    const arr = x => Array.isArray(x) ? x : [];
+
+    // Build an element. Text goes in via textContent, so model output can never inject HTML.
+    function el(tag, cls, text) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined) n.textContent = text;
+      return n;
+    }
+
+    const ENDPOINT = "/chat";   // same origin as the page, so no CORS needed
+    let busy = false;
+    let chart = null;           // current Chart.js instance
+
+    // ---------- Clock + backend status ----------
+    setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString("en-GB"); }, 1000);
+
+    function setStatus(on) {
+      $("light").className = "light " + (on ? "on" : "off");
+      $("statusText").textContent = on ? "BACKEND ONLINE" : "BACKEND OFFLINE";
+    }
+    async function ping() {
+      // FastAPI serves /openapi.json by default, so it doubles as a health check.
+      try { setStatus((await fetch("/openapi.json", { cache: "no-store" })).ok); }
+      catch { setStatus(false); }
+    }
+    ping();
+    setInterval(ping, 30000);
+
+    // ---------- Console output ----------
+    function scrollLog() { const l = $("log"); l.scrollTop = l.scrollHeight; }
+
+    function addLine(cls, text) {
+      const n = el("div", cls, text);
+      $("log").appendChild(n);
+      scrollLog();
+      return n;
+    }
+
+    function showError(msg) { addLine("err", "ERR: " + msg); }
+
+    // Typewriter effect. Click the text to skip to the end.
+    function typeText(node, text) {
+      return new Promise(resolve => {
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          node.textContent = text; return resolve();
+        }
+        let i = 0;
+        node.classList.add("cur");
+        const finish = () => {
+          clearInterval(timer);
+          node.textContent = text;
+          node.classList.remove("cur");
+          node.removeEventListener("click", finish);
+          scrollLog();
+          resolve();
+        };
+        const timer = setInterval(() => {
+          i += 4;
+          node.textContent = text.slice(0, i);
+          scrollLog();
+          if (i >= text.length) finish();
+        }, 16);
+        node.addEventListener("click", finish);
+      });
+    }
+
+    // Collapsible block under an answer. Returns null when there is nothing to show.
+    function section(title, lines) {
+      if (!lines.length) return null;
+      const d = el("details", "sec");
+      d.appendChild(el("summary", null, title + " (" + lines.length + ")"));
+      const ul = el("ul");
+      lines.forEach(l => ul.appendChild(l));
+      d.appendChild(ul);
+      return d;
+    }
+
+    // "finding: evidence [source p.3]" for key_findings and sources
+    function evidenceLine(e) {
+      const where = (e.source || "unknown source") + (e.page != null ? " p." + e.page : "");
+      const body = e.evidence ? e.finding + ": " + e.evidence : (e.finding || "");
+      return el("li", null, body + " [" + where + "]");
+    }
+    const textLine = t => el("li", null, String(t));
+
+    async function renderAnswer(d) {
+      const box = el("div", "a");
+      const txt = el("div", "txt");
+      box.appendChild(txt);
+      $("log").appendChild(box);
+
+      await typeText(txt, String(d.answer || "No answer returned."));
+
+      [
+        section("Key findings", arr(d.key_findings).map(evidenceLine)),
+        section("Space safety implications", arr(d.space_safety_implications).map(textLine)),
+        section("Limitations", arr(d.limitations).map(textLine)),
+        section("Sources", arr(d.sources).map(evidenceLine)),
+      ].forEach(s => { if (s) box.appendChild(s); });
+      scrollLog();
+    }
+
+    // ---------- Telemetry panels ----------
+    function renderChart(spec) {
+      if (chart) { chart.destroy(); chart = null; }
+
+      // Ignore anything unusable: null, unknown type, empty, or labels/values of different length.
+      const ok = spec
+        && ["bar", "line", "pie"].includes(spec.chart_type)
+        && Array.isArray(spec.labels) && Array.isArray(spec.values)
+        && spec.labels.length > 0
+        && spec.labels.length === spec.values.length;
+
+      $("chartBox").hidden = !ok;
+      $("chartEmpty").hidden = !!ok;
+      if (!ok) return;
+      if (typeof Chart === "undefined") return showError("CHART LIBRARY FAILED TO LOAD");
+
+      // Chart.js defaults so everything matches the console look
+      Chart.defaults.font.family = '"JetBrains Mono", ui-monospace, monospace';
+      Chart.defaults.font.size = 11;
+      Chart.defaults.color = "#6b7885";
+
+      const pie = spec.chart_type === "pie";
+      const shades = ["#5fd7e6", "#3fa3b3", "#2b7380", "#8aa4b5", "#4d6272", "#1f4650"];
+      const axis = { ticks: { color: "#6b7885" }, grid: { color: "rgba(95,215,230,.08)" } };
+
+      chart = new Chart($("chartCanvas"), {
+        type: spec.chart_type,
+        data: {
+          labels: spec.labels,
+          datasets: [{
+            data: spec.values,
+            borderColor: pie ? "#0f1217" : "#5fd7e6",
+            backgroundColor: pie ? shades : (spec.chart_type === "bar" ? "rgba(95,215,230,.35)" : "rgba(95,215,230,.1)"),
+            borderWidth: pie ? 2 : 1.5,
+            pointRadius: 3,
+            tension: 0,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: pie },
+            title: { display: !!spec.title, text: spec.title, color: "#c9d3dc", font: { weight: "400" } },
+            tooltip: { backgroundColor: "#0a0c0f", borderColor: "#1f2630", borderWidth: 1, cornerRadius: 2 },
+          },
+          scales: pie ? {} : { x: axis, y: axis },
+        },
+      });
+    }
+
+    function renderData(rows) {
+      const box = $("dataBox");
+      box.replaceChildren();
+      rows = arr(rows);
+      if (!rows.length) { box.appendChild(el("p", "empty", "NO MEASUREMENTS RETURNED")); return; }
+
+      const table = el("table");
+      const head = el("tr");
+      ["ID", "FUEL", "GRAVITY", "MEASUREMENT", "VALUE", "UNIT"].forEach(c => head.appendChild(el("th", null, c)));
+      table.appendChild(head);
+      rows.forEach(r => {
+        const tr = el("tr");
+        [r.experiment_id, r.fuel, r.gravity_condition, r.measurement, r.value, r.unit]
+          .forEach(v => tr.appendChild(el("td", null, v == null ? "-" : String(v))));
+        table.appendChild(tr);
+      });
+      const wrap = el("div", "scroll");
+      wrap.appendChild(table);
+      box.appendChild(wrap);
+    }
+
+    function renderImages(items) {
+      const box = $("frames");
+      box.replaceChildren();
+      items = arr(items);
+      if (!items.length) { box.appendChild(el("p", "empty", "NO IMAGES MATCHED")); return; }
+
+      const grid = el("div", "grid");
+      items.forEach(it => {
+        const fig = el("figure");
+        // Only load images the backend serves itself
+        if (typeof it.image_url === "string" && it.image_url.startsWith("/uploaded_images/")) {
+          const a = el("a");
+          a.href = it.image_url; a.target = "_blank"; a.rel = "noopener";
+          const img = el("img");
+          img.src = it.image_url; img.alt = it.description || "Retrieved image"; img.loading = "lazy";
+          a.appendChild(img);
+          fig.appendChild(a);
+        } else {
+          fig.appendChild(el("div", "noimg", "NO PREVIEW"));
+        }
+        const cap = el("figcaption");
+        cap.appendChild(el("span", "tag", "MATCH"));
+        cap.appendChild(document.createTextNode(" " + (it.description || it.source || "")));
+        fig.appendChild(cap);
+        grid.appendChild(fig);
+      });
+      box.appendChild(grid);
+    }
+
+    function renderTrace(d, ms) {
+      const rows = {
+        latency: ms + " ms",
+        findings: arr(d.key_findings).length,
+        sources: arr(d.sources).length,
+        measurements: arr(d.experimental_data).length,
+        images: arr(d.related_images).length,
+        chart: d.charts && d.charts.chart_type ? d.charts.chart_type : "none",
+      };
+      const box = $("trace");
+      box.replaceChildren();
+      Object.entries(rows).forEach(([k, v]) => {
+        const r = el("div", "kv");
+        r.appendChild(el("span", "k", k));
+        r.appendChild(el("span", null, String(v)));
+        box.appendChild(r);
+      });
+    }
+
+    // ---------- Sending a question ----------
+    function setBusy(b) { busy = b; $("send").disabled = b; }
+
+    async function sendMessage() {
+      const q = $("input").value.trim();
+      if (!q || busy) return;
+      $("input").value = "";
+      setBusy(true);
+      addLine("q", "> " + q);
+      const wait = addLine("wait cur", "QUERYING VECTOR STORE...");
+
+      const t0 = performance.now();
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 120000); // give up after 2 minutes
+
+      try {
+        const res = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: q }),
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+        const data = await res.json();
+        if (!data || typeof data !== "object") throw new Error("MALFORMED RESPONSE");
+        if (data.error) throw new Error(data.error);
+
+        wait.remove();
+        const ms = Math.round(performance.now() - t0);
+        // Telemetry first so the chart appears while the answer types out
+        renderChart(data.charts);
+        renderData(data.experimental_data);
+        renderImages(data.related_images);
+        renderTrace(data, ms);
+        await renderAnswer(data);
+      } catch (e) {
+        wait.remove();
+        showError(e.name === "AbortError" ? "MODEL TIMEOUT (120 s)" : e.message);
+      } finally {
+        clearTimeout(timer);
+        setBusy(false);
+        $("input").focus();
+      }
+    }
+
+    $("send").addEventListener("click", sendMessage);
+    $("input").addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+
+    // ---------- Ingest (uploads go into the vector store) ----------
+    const INGEST = [
+      { label: "PDF document", path: "/upload/text", accept: ".pdf" },
+      { label: "Image", path: "/upload/image", accept: ".jpg,.jpeg,.png,.webp" },
+      { label: "CSV table", path: "/upload/tables", accept: ".csv" },
+    ];
+
+    async function upload(spec, file, status) {
+      status.className = "st";
+      status.textContent = "UPLOADING " + file.name + "...";
+      const form = new FormData();
+      form.append("file", file);   // field name must match the backend parameter: file
+      try {
+        const res = await fetch(spec.path, { method: "POST", body: form });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const out = await res.json().catch(() => null);
+        if (out && out.error) throw new Error(out.error);
+        status.textContent = "INDEXED: " + file.name;
+        status.classList.add("ok");
+      } catch (e) {
+        status.textContent = "ERR: " + e.message;
+        status.classList.add("bad");
+      }
+    }
+
+    function buildIngest() {
+      INGEST.forEach(spec => {
+        const row = el("div", "irow");
+        const status = el("div", "st", "READY");
+        const input = el("input");
+        input.type = "file"; input.accept = spec.accept; input.hidden = true;
+        const btn = el("button", "btn", "ADD");
+        btn.setAttribute("aria-label", "Add " + spec.label);
+        btn.addEventListener("click", () => input.click());
+        input.addEventListener("change", () => {
+          if (input.files[0]) upload(spec, input.files[0], status);
+          input.value = "";
+        });
+        row.append(el("span", null, spec.label), btn, status, input);
+        $("ingest").appendChild(row);
+      });
+    }
+    buildIngest();
+
+    addLine("sys", "SYSTEM READY. Ask a question below, or add documents under Ingest.");
+  </script>
+</body>
+
+</html>
